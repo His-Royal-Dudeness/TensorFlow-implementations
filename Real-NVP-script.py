@@ -5,10 +5,11 @@ import tensorflow_probability as tfp
 from sklearn.datasets import make_moons
 data = make_moons(10000, noise=0.05)[0]
 
-epochs = 1000
-num_of_layers = 3
+epochs = 1500
+num_of_layers = 5
+hidden_layers_size = 30
 num_of_cells = 8
-learning_rate = 5e-2
+learning_rate = 1e-2
 num_of_complete_batches = 10
 
 num_of_features = int(data.shape[1])
@@ -24,21 +25,27 @@ def printer(loss, epoch):
 #creating dictionaries for weights and biases
 weights = dict()
 biases = dict()
-for i in range(num_of_cells):
-    for j in range(num_of_layers - 1):
-        weights['s_up' + str(i) + str(j)] = glorot_init(
-            [int(np.floor(num_of_features / 2)), int(np.floor(num_of_features / 2))])
-        biases['s_up' + str(i) + str(j)] = glorot_init([int(np.floor(num_of_features / 2))])
-        weights['s_down' + str(i) + str(j)] = glorot_init(
-            [int(np.ceil(num_of_features / 2)), int(np.ceil(num_of_features / 2))])
-        biases['s_down' + str(i) + str(j)] = glorot_init([int(np.ceil(num_of_features / 2))])
 
-        weights['t_up' + str(i) + str(j)] = glorot_init(
-            [int(np.floor(num_of_features / 2)), int(np.floor(num_of_features / 2))])
-        biases['t_up' + str(i) + str(j)] = glorot_init([int(np.floor(num_of_features / 2))])
-        weights['t_down' + str(i) + str(j)] = glorot_init(
-            [int(np.ceil(num_of_features / 2)), int(np.ceil(num_of_features / 2))])
-        biases['t_down' + str(i) + str(j)] = glorot_init([int(np.ceil(num_of_features / 2))])
+
+for i in range(num_of_cells):
+    weights['s_up' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    biases['s_up' + str(i) + str(0)] = glorot_init([hidden_layers_size])
+    weights['s_down' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    biases['s_down' + str(i) + str(0)] = glorot_init([hidden_layers_size])
+    weights['t_up' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    biases['t_up' + str(i) + str(0)] = glorot_init([hidden_layers_size])
+    weights['t_down' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    biases['t_down' + str(i) + str(0)] = glorot_init([hidden_layers_size])
+    for j in range(1, num_of_layers - 1):
+        weights['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, hidden_layers_size])
+        biases['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size])
+        weights['s_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, hidden_layers_size])
+        biases['s_down' + str(i) + str(j)] = glorot_init([hidden_layers_size])
+
+        weights['t_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, hidden_layers_size])
+        biases['t_up' + str(i) + str(j)] = glorot_init([hidden_layers_size])
+        weights['t_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, hidden_layers_size])
+        biases['t_down' + str(i) + str(j)] = glorot_init([hidden_layers_size])
 
     # this part is necessary when the number of features is odd so that the ceil and floor methods won't mix up.
     # if the number of features is even, then it would have been enough to change line 41 into:
@@ -47,18 +54,14 @@ for i in range(num_of_cells):
         j = 0
     else:
         j = j + 1
-    weights['s_up' + str(i) + str(j)] = glorot_init(
-        [int(np.floor(num_of_features / 2)), int(np.ceil(num_of_features / 2))])
+    weights['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.ceil(num_of_features / 2))])
     biases['s_up' + str(i) + str(j)] = glorot_init([int(np.ceil(num_of_features / 2))])
-    weights['s_down' + str(i) + str(j)] = glorot_init(
-        [int(np.ceil(num_of_features / 2)), int(np.floor(num_of_features / 2))])
+    weights['s_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.floor(num_of_features / 2))])
     biases['s_down' + str(i) + str(j)] = glorot_init([int(np.floor(num_of_features / 2))])
 
-    weights['t_up' + str(i) + str(j)] = glorot_init(
-        [int(np.floor(num_of_features / 2)), int(np.ceil(num_of_features / 2))])
+    weights['t_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.ceil(num_of_features / 2))])
     biases['t_up' + str(i) + str(j)] = glorot_init([int(np.ceil(num_of_features / 2))])
-    weights['t_down' + str(i) + str(j)] = glorot_init(
-        [int(np.ceil(num_of_features / 2)), int(np.floor(num_of_features / 2))])
+    weights['t_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.floor(num_of_features / 2))])
     biases['t_down' + str(i) + str(j)] = glorot_init([int(np.floor(num_of_features / 2))])
 
     def NN(batch, key, num_of_layers, weights, biases):
@@ -101,10 +104,10 @@ for i in range(num_of_cells):
 
     def optimize(batch_x, weights, biases ,optimizer, dist, num_of_features, num_of_cells):
         with tf.GradientTape() as g:
-            l2_reg = tf.reduce_sum(0.0000002 * tf.square([r for r in weights.values()]))
+            # l2_reg = tf.reduce_sum(0.0000002 * tf.square([r for r in weights.values()]))
             curr_y, sum_log_s = forward_pass_func(batch_x, num_of_features, num_of_cells, weights, biases)
             #the loss is log of the likelihood in the latent space. (including the determinant of the jacobian).
-            loss = -tf.reduce_mean(tf.cast(dist.log_prob(tf.cast(curr_y, tf.float32)), tf.float64) + sum_log_s, 0)+l2_reg
+            loss = -tf.reduce_mean(tf.cast(dist.log_prob(tf.cast(curr_y, tf.float32)), tf.float64) + sum_log_s, 0)#+l2_reg
         trainable_variables = [[r for r in weights.values()] + [r for r in biases.values()]][0]
         gradients = g.gradient(loss, trainable_variables)
         optimizer.apply_gradients(zip(gradients, trainable_variables))
@@ -157,3 +160,8 @@ def generate(batch_x, num_of_features, num_of_cells, weights, biases):
     return batch_x
 
 print('***')
+
+samples = dist.sample(10000)
+gen = generate(tf.cast(samples, tf.float64), num_of_features, num_of_cells, weights, biases)
+import matplotlib.pyplot as plt
+plt.scatter(gen.numpy()[:, 0], gen.numpy()[:, 1], s=0.7)
