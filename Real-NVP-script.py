@@ -6,14 +6,16 @@ from sklearn.datasets import make_moons
 data = make_moons(10000, noise=0.05)[0]
 
 epochs = 1500
-num_of_layers = 5
-hidden_layers_size = 30
-num_of_cells = 8
+num_of_hidden_layers = 2  #number of layers in each cell
+hidden_layers_size = 30 #number of nodes in each cell
+num_of_cells = 7 #number of cells in the flow - number of affine transformations
 learning_rate = 1e-2
 num_of_complete_batches = 10
 
 num_of_features = int(data.shape[1])
-net_size = [num_of_features, num_of_cells, num_of_layers]
+len_up   = int(np.floor(num_of_features / 2)) #size of upper part of sample
+len_down = int(np.ceil(num_of_features / 2)) #size of down part of sample
+#the ceil and floor are incase there is an odd number of features.
 
 def glorot_init(shape):
     return tf.Variable(tf.cast(tf.random.normal(shape=shape, stddev=1. / tf.sqrt(shape[0] / 2.), seed=0), dtype=tf.float64))
@@ -28,15 +30,17 @@ biases = dict()
 
 
 for i in range(num_of_cells):
-    weights['s_up' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    weights['s_up' + str(i) + str(0)] = glorot_init([len_up, hidden_layers_size])
     biases['s_up' + str(i) + str(0)] = glorot_init([hidden_layers_size])
-    weights['s_down' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    weights['s_down' + str(i) + str(0)] = glorot_init([len_down, hidden_layers_size])
     biases['s_down' + str(i) + str(0)] = glorot_init([hidden_layers_size])
-    weights['t_up' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    weights['t_up' + str(i) + str(0)] = glorot_init([len_up, hidden_layers_size])
     biases['t_up' + str(i) + str(0)] = glorot_init([hidden_layers_size])
-    weights['t_down' + str(i) + str(0)] = glorot_init([int(np.floor(num_of_features / 2)), hidden_layers_size])
+    weights['t_down' + str(i) + str(0)] = glorot_init([len_down, hidden_layers_size])
     biases['t_down' + str(i) + str(0)] = glorot_init([hidden_layers_size])
-    for j in range(1, num_of_layers - 1):
+
+    j=0
+    for j in range(1, num_of_hidden_layers):
         weights['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, hidden_layers_size])
         biases['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size])
         weights['s_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, hidden_layers_size])
@@ -49,27 +53,27 @@ for i in range(num_of_cells):
 
     # this part is necessary when the number of features is odd so that the ceil and floor methods won't mix up.
     # if the number of features is even, then it would have been enough to change line 41 into:
-    # for j in range(self.num_of_layers): - and erase the next part.
-    if num_of_layers == 1:
-        j = 0
-    else:
-        j = j + 1
-    weights['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.ceil(num_of_features / 2))])
-    biases['s_up' + str(i) + str(j)] = glorot_init([int(np.ceil(num_of_features / 2))])
-    weights['s_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.floor(num_of_features / 2))])
-    biases['s_down' + str(i) + str(j)] = glorot_init([int(np.floor(num_of_features / 2))])
+    # for j in range(num_of_hidden_layers): - and erase the next part.
+    # if num_of_hidden_layers == 1:
+    #     j = 1
+    # else:
+    j = j + 1
+    weights['s_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, len_down])
+    biases['s_up' + str(i) + str(j)] = glorot_init([len_down])
+    weights['s_down' + str(i) + str(j)] = glorot_init([hidden_layers_size,len_up])
+    biases['s_down' + str(i) + str(j)] = glorot_init([len_up])
 
-    weights['t_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.ceil(num_of_features / 2))])
-    biases['t_up' + str(i) + str(j)] = glorot_init([int(np.ceil(num_of_features / 2))])
-    weights['t_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, int(np.floor(num_of_features / 2))])
-    biases['t_down' + str(i) + str(j)] = glorot_init([int(np.floor(num_of_features / 2))])
+    weights['t_up' + str(i) + str(j)] = glorot_init([hidden_layers_size, len_down])
+    biases['t_up' + str(i) + str(j)] = glorot_init([len_down])
+    weights['t_down' + str(i) + str(j)] = glorot_init([hidden_layers_size, len_up])
+    biases['t_down' + str(i) + str(j)] = glorot_init([len_up])
 
-    def NN(batch, key, num_of_layers, weights, biases):
-        for k in range(num_of_layers):
-            if k==num_of_layers-1:
-                batch = tf.nn.dropout(tf.matmul(batch, weights[key + str(k)]) + biases[key + str(k)], rate=0.00)
+    def NN(batch, key, num_of_hidden_layers, weights, biases):
+        for k in range(num_of_hidden_layers+1):
+            if k==num_of_hidden_layers:
+                batch = tf.matmul(batch, weights[key + str(k)]) + biases[key + str(k)]
             else:
-               batch = tf.nn.dropout(tf.nn.sigmoid(tf.matmul(batch, weights[key + str(k)]) + biases[key + str(k)]), rate=0.00)
+               batch = tf.nn.sigmoid(tf.matmul(batch, weights[key + str(k)]) + biases[key + str(k)])
         return batch
     NN_func = tf.function(NN)
 
@@ -81,15 +85,13 @@ for i in range(num_of_cells):
         #computing the s & t that each cell outputs for the upper and lower part
         for j in range(num_of_cells):
             #using the upper input to compute s_down & t_down
-            # log_s_down = (1-tf.nn.relu(self.NN_func(batch_1, 's_up' + str(j))))/self.num_of_features
-            log_s_down = tf.tanh(NN_func(batch_1, 's_up' + str(j), num_of_layers, weights, biases))#/self.num_of_features
-            t_down = tf.tanh(NN_func(batch_1, 't_up' + str(j), num_of_layers, weights, biases))
+            log_s_down = tf.tanh(NN(batch_1, 's_up' + str(j), num_of_hidden_layers, weights, biases))#/self.num_of_features
+            t_down = tf.tanh(NN_func(batch_1, 't_up' + str(j), num_of_hidden_layers, weights, biases))
             y_2 = tf.multiply(batch_2, tf.exp(log_s_down)) + t_down
             #using the output of the above to comupte s_up & t_up - that way we keep the determinant of the Jacobian simple
             #and still "mix" the features in every iteration
-            # log_s_up = (1-tf.nn.relu(self.NN_func(y_2, 's_down' + str(j))))/self.num_of_features
-            log_s_up = tf.tanh(NN_func(y_2, 's_down' + str(j), num_of_layers, weights, biases))#/self.num_of_features
-            t_up = tf.tanh(NN_func(y_2, 't_down' + str(j), num_of_layers, weights, biases))
+            log_s_up = tf.tanh(NN(y_2, 's_down' + str(j), num_of_hidden_layers, weights, biases))#/self.num_of_features
+            t_up = tf.tanh(NN_func(y_2, 't_down' + str(j), num_of_hidden_layers, weights, biases))
             y_1 = tf.multiply(batch_1, tf.exp(log_s_up)) + t_up
 
             batch_1 = y_1
@@ -104,20 +106,19 @@ for i in range(num_of_cells):
 
     def optimize(batch_x, weights, biases ,optimizer, dist, num_of_features, num_of_cells):
         with tf.GradientTape() as g:
-            # l2_reg = tf.reduce_sum(0.0000002 * tf.square([r for r in weights.values()]))
             curr_y, sum_log_s = forward_pass_func(batch_x, num_of_features, num_of_cells, weights, biases)
             #the loss is log of the likelihood in the latent space. (including the determinant of the jacobian).
-            loss = -tf.reduce_mean(tf.cast(dist.log_prob(tf.cast(curr_y, tf.float32)), tf.float64) + sum_log_s, 0)#+l2_reg
+            loss = -tf.reduce_mean(tf.cast(dist.log_prob(tf.cast(curr_y, tf.float32)), tf.float64) + sum_log_s, 0)
         trainable_variables = [[r for r in weights.values()] + [r for r in biases.values()]][0]
         gradients = g.gradient(loss, trainable_variables)
         optimizer.apply_gradients(zip(gradients, trainable_variables))
         return loss
     optimize_func = tf.function(optimize)
 
-dist = tfp.distributions.MultivariateNormalDiag(loc=[0.0] * num_of_features,
-                                                 scale_diag=[1.0] * num_of_features)
+dist = tfp.distributions.MultivariateNormalDiag(loc=[0.0] * num_of_features, scale_diag=[1.0] * num_of_features)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
 
+#calculating batch size
 batch_size = int(len(data) / num_of_complete_batches)
 residual = len(data) % batch_size
 
@@ -142,13 +143,13 @@ def generate(batch_x, num_of_features, num_of_cells, weights, biases):
         # using the output of the above to comupte s_up & t_up - that way we keep the determinant of the Jacobian simple
         # and still "mix" the features in every iteration
         # log_s_up = (1-tf.nn.relu(self.NN_func(y_2, 's_down' + str(j))))/self.num_of_features
-        log_s_up = tf.tanh(NN_func(batch_2, 's_down' + str(j), num_of_layers, weights, biases))  # /self.num_of_features
-        t_up = tf.tanh(NN_func(batch_2, 't_down' + str(j), num_of_layers, weights, biases))
+        log_s_up = tf.tanh(NN_func(batch_2, 's_down' + str(j), num_of_hidden_layers, weights, biases))  # /self.num_of_features
+        t_up = tf.tanh(NN_func(batch_2, 't_down' + str(j), num_of_hidden_layers, weights, biases))
         y_1 = tf.multiply((batch_1 - t_up), 1 / tf.exp(log_s_up))
         # using the upper input to compute s_down & t_down
         # log_s_down = (1-tf.nn.relu(self.NN_func(batch_1, 's_up' + str(j))))/self.num_of_features
-        log_s_down = tf.tanh(NN_func(y_1, 's_up' + str(j), num_of_layers, weights, biases))  # /self.num_of_features
-        t_down = tf.tanh(NN_func(y_1, 't_up' + str(j), num_of_layers, weights, biases))
+        log_s_down = tf.tanh(NN_func(y_1, 's_up' + str(j), num_of_hidden_layers, weights, biases))  # /self.num_of_features
+        t_down = tf.tanh(NN_func(y_1, 't_up' + str(j), num_of_hidden_layers, weights, biases))
         y_2 = tf.multiply((batch_2 - t_down), 1 / tf.exp(log_s_down))
 
         batch_1 = y_1
