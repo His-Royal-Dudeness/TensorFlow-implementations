@@ -5,9 +5,9 @@ import tensorflow_probability as tfp
 from sklearn.datasets import make_moons
 data = make_moons(10000, noise=0.05)[0]
 
-epochs = 700
+epochs = 1500
 num_of_hidden_layers = 3  #number of layers in each cell
-hidden_layers_size = 30 #number of nodes in each layer
+hidden_layers_size = 30 #number of nodes in each cell
 num_of_cells = 7 #number of cells in the flow - number of affine transformations
 learning_rate = 1e-2
 num_of_complete_batches = 10
